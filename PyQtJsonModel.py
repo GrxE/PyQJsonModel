@@ -1,5 +1,11 @@
 # 2017 by Gregor Engberding , MIT License
 
+import sys
+
+from PyQt5.QtCore import QAbstractItemModel, QModelIndex, Qt, QAbstractListModel, QMimeData, \
+    QDataStream, QByteArray, QJsonDocument, QVariant, QJsonValue, QJsonParseError
+from PyQt5.QtWidgets import QApplication, QFileDialog, QTreeView
+
 class QJsonTreeItem(object):
     def __init__(self, parent=None):
 
