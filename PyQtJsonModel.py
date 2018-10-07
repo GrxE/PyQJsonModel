@@ -112,10 +112,12 @@ class QJsonModel(QAbstractItemModel):
         if fileName is None or fileName is False:
             return False
 
-        with open(fileName,"r",encoding="utf-8") as file:
+        with open(fileName, "rb" ) as file:
             if file is None:
                 return False
-            self.loadJson(file)
+            else:
+                jsonTxt = file.read()
+                self.loadJson(jsonTxt)
 
     def loadJson(self, json):
         error = QJsonParseError()
