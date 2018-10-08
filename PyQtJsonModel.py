@@ -6,7 +6,9 @@ from PyQt5.QtCore import QAbstractItemModel, QModelIndex, Qt, QAbstractListModel
     QDataStream, QByteArray, QJsonDocument, QVariant, QJsonValue, QJsonParseError
 from PyQt5.QtWidgets import QApplication, QFileDialog, QTreeView
 
-class QJsonTreeItem(object):
+class QJsonTreeItem(object ):
+    # Please note that its baseclass is object, not is QObject !!
+    # If you try use QObejct , may be can't drag and drop itself.
     def __init__(self, parent=None):
 
         self.mParent = parent
