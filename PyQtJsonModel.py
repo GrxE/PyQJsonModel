@@ -233,6 +233,9 @@ if __name__ == '__main__':
                            }
                        ]
                    }"""
+# or 
+#    with open("./your.json","rb") as f:
+#        json = f.read()
 
     model.loadJson(json)
     view.show()
