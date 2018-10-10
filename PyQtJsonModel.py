@@ -237,6 +237,8 @@ if __name__ == '__main__':
                    }"""
 
     model.loadJson(json)
+#or
+#    model.load("./your.json")
     view.show()
 
     sys.exit(app.exec_())
