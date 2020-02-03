@@ -25,14 +25,9 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "License :: (c) 2020 by Gregor Engberding, MIT-License",
         "Operating System :: OS Independent",
-    ],
+        ],
 
     install_requires=[
-        "pynacl >= 1.3",
-        "pytest",
-        "lxml",
-        "defusedxml",
-        "cachetools",
-        "pymongo",
+        "PySide2",
         ],
-)
+    )
