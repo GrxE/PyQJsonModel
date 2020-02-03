@@ -1,142 +1,176 @@
-# 2017 by Gregor Engberding , MIT License
-
+# 2017-2020 by Gregor Engberding , MIT License
+import logging
 import sys
 
-from PySide2.QtCore import QAbstractItemModel, QModelIndex, Qt, QJsonDocument, QJsonValue, QJsonParseError
+from PySide2.QtCore import QAbstractItemModel, QModelIndex, Qt, QJsonDocument, QJsonParseError
 from PySide2.QtWidgets import QApplication, QTreeView
 
+DEMO_JSON = b"""{
+                   "firstName": "John",
+                   "lastName": "Smith",
+                   "age": 25,
+                   "address":
+                   {
+                       "streetAddress": "21 2nd Street",
+                       "city": "New York",
+                       "state": "NY",
+                       "postalCode": "10021"
+                   },
+                   "phoneNumber":
+                   [
+                       {
+                         "type": "home",
+                         "number": "212 555-1234"
+                       },
+                       {
+                         "type": "fax",
+                         "number": "646 555-4567"
+                       }
+                   ]
+               }"""
 
-class QJsonTreeItem(object):
-    # Please note that its baseclass is object, not is QObject !!
-    # If you try use QObject , may be can't drag and drop itself.
-    def __init__(self, parent=None):
+DEMO_DICT = {
+    "firstName"  : "John",
+    "lastName"   : "Smith",
+    "age"        : 25,
+    "address"    :
+        {
+            "streetAddress": "21 2nd Street",
+            "city"         : "New York",
+            "state"        : "NY",
+            "postalCode"   : "10021"
+            },
+    "phoneNumber":
+        [
+            {
+                "type"  : "home",
+                "number": "212 555-1234"
+                },
+            {
+                "type"  : "fax",
+                "number": "646 555-4567"
+                }
+            ]
+    }
 
-        self.mParent = parent
-        self.mChilds = []
-        self.mType = None
-        self.mValue = None
 
-    def appendChild(self, item):
-        self.mChilds.append(item)
+class QJsonTreeItem:
+    """A tree node with parent and children
 
-    def child(self, row: int):
-        return self.mChilds[row]
+    For easy display by the QJsonModel
 
-    def parent(self):
-        return self.mParent
+    """
 
-    def childCount(self):
-        return len(self.mChilds)
+    def __init__(self, parent=None, value=None):
+
+        self.parent = parent
+        self.children = []
+        self.value = None
+        self.key = None
+        self.typename = None
+
+        if value:
+            self.init_tree(value, parent)
 
     def row(self):
-        if self.mParent is not None:
-            return self.mParent.mChilds.index(self)
-        return 0
+        """Special for Qt, the row(aka. index) in it´s parent children
 
-    def setKey(self, key: str):
-        self.mKey = key
+        :return: Own index in parent´s children or -1
+        """
+        if self.parent is not None:
+            return self.parent.children.index(self)
+        return -1
 
-    def setValue(self, value: str):
-        self.mValue = value
+    def init_tree(self, value, parent=None):
+        """Initializes the tree below parent with value
 
-    def setType(self, type: QJsonValue.Type):
-        self.mType = type
-
-    def key(self):
-        return self.mKey
-
-    def value(self):
-        return self.mValue
-
-    def type(self):
-        return self.mType
-
-    def load(self, value, parent=None):
-
-        rootItem = QJsonTreeItem(parent)
-        rootItem.setKey("root")
-        jsonType = None
-
-        try:
-            value = value.toVariant()
-            jsonType = value.type()
-        except AttributeError:
-            pass
-
-        try:
-            value = value.toObject()
-            jsonType = value.type()
-
-        except AttributeError:
-            pass
+        :param value: the value to be inserted below parent
+        :param parent: insert value below this parent, if None, it´s the root node
+        :return: the tree-structure of QJsonTreeItems
+        """
+        root_item = QJsonTreeItem(parent)
+        root_item.key = "root"
 
         if isinstance(value, dict):
-            # process the key/value pairs
-            for key in value:
-                v = value[key]
-                child = self.load(v, rootItem)
-                child.setKey(key)
-                try:
-                    child.setType(v.type())
-                except AttributeError:
-                    child.setType(v.__class__)
-                rootItem.appendChild(child)
+            for key, val in value.items():
+                child = self.init_tree(val, root_item)
+                child.key = key
+                root_item.children.append(child)
 
         elif isinstance(value, list):
-            # process the values in the list
-            for i, v in enumerate(value):
-                child = self.load(v, rootItem)
-                child.setKey(str(i))
-                child.setType(v.__class__)
-                rootItem.appendChild(child)
+            for idx, val in enumerate(value):
+                child = self.init_tree(val, root_item)
+                child.key = idx
+                root_item.children.append(child)
 
         else:
-            # value is processed
-            rootItem.setValue(value)
-            try:
-                rootItem.setType(value.type())
-            except AttributeError:
-                if jsonType is not None:
-                    rootItem.setType(jsonType)
-                else:
-                    rootItem.setType(value.__class__)
+            root_item.value = value
 
-        return rootItem
+        root_item.typename = type(value).__name__
+        return root_item
 
 
 class QJsonModel(QAbstractItemModel):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.mRootItem = QJsonTreeItem()
-        self.mHeaders = ["key", "value", "type"]
+    """To be used as a model with a QTreeView to show contents of a JSON
 
-    def load(self, fileName):
-        if fileName is None or fileName is False:
+    """
+    def __init__(self, parent=None, json_data=None):
+        super().__init__(parent)
+        self.document = None
+        self.root_item = QJsonTreeItem()
+        self.headers = ["key", "value", "type"]
+        if json_data:
+            self.update_data(json_data)
+
+    def update_data(self, json_data):
+        """New data for the model
+
+        :param json_data: binary JSON, a dict or a filename
+        :return:
+        """
+        error = QJsonParseError()
+        try:
+            self.document = QJsonDocument.fromJson(json_data, error)
+        except TypeError:
+            if isinstance(json_data, dict):
+                self.document = QJsonDocument.fromVariant(json_data)
+
+        if self.document is not None:
+            self.beginResetModel()
+            if self.document.isArray():
+                self.root_item.init_tree(list(self.document.array()))
+            else:
+                self.root_item = self.root_item.init_tree(self.document.object())
+            self.endResetModel()
+            return
+
+        else:
+            # try as file
+            print(f"from file")
+            if self.load_from_file(filename=json_data):
+                return
+
+        msg = f"Unable to load as JSON:{json_data}"
+        logging.log(logging.DEBUG, msg)
+        raise ValueError(msg)
+
+    def load_from_file(self, filename):
+        """Loads JSON from filename
+
+        :param filename: name of json-file
+        :return: (bool) True=success, False=failed
+        """
+        if filename is None or filename is False:
             return False
 
-        with open(fileName, "rb") as file:
+        with open(filename, "rb") as file:
             if file is None:
                 return False
-            else:
-                jsonTxt = file.read()
-                self.loadJson(jsonTxt)
 
-    def loadJson(self, json):
-        error = QJsonParseError()
-        self.mDocument = QJsonDocument.fromJson(json, error)
+            json_data = file.read()
+            self.update_data(json_data)
 
-        if self.mDocument is not None:
-            self.beginResetModel()
-            if self.mDocument.isArray():
-                self.mRootItem.load(list(self.mDocument.array()))
-            else:
-                self.mRootItem = self.mRootItem.load(self.mDocument.object())
-            self.endResetModel()
-
-            return True
-
-        print("QJsonModel: error loading Json")
-        return False
+        return True
 
     def data(self, index: QModelIndex, role: int = ...):
         if not index.isValid():
@@ -147,12 +181,12 @@ class QJsonModel(QAbstractItemModel):
 
         if role == Qt.DisplayRole:
             if col == 0:
-                return item.key()
+                return item.key
             elif col == 1:
-                value = item.value()
+                value = item.value
                 return value
             elif col == 2:
-                return str(item.type())
+                return item.typename
 
         return None
 
@@ -161,7 +195,7 @@ class QJsonModel(QAbstractItemModel):
             return None
 
         if orientation == Qt.Horizontal:
-            return self.mHeaders[section]
+            return self.headers[section]
 
         return None
 
@@ -170,12 +204,12 @@ class QJsonModel(QAbstractItemModel):
             return QModelIndex()
 
         if not parent.isValid():
-            parentItem = self.mRootItem
+            parent_item = self.root_item
         else:
-            parentItem = parent.internalPointer()
+            parent_item = parent.internalPointer()
         try:
-            childItem = parentItem.child(row)
-            return self.createIndex(row, column, childItem)
+            child_item = parent_item.children[row]
+            return self.createIndex(row, column, child_item)
         except IndexError:
             return QModelIndex()
 
@@ -183,23 +217,23 @@ class QJsonModel(QAbstractItemModel):
         if not index.isValid():
             return QModelIndex()
 
-        childItem = index.internalPointer()
-        parentItem = childItem.parent()
+        child_item = index.internalPointer()
+        parent_item = child_item.parent
 
-        if parentItem == self.mRootItem:
+        if parent_item == self.root_item:
             return QModelIndex()
 
-        return self.createIndex(parentItem.row(), 0, parentItem)
+        return self.createIndex(parent_item.row(), 0, parent_item)
 
     def rowCount(self, parent: QModelIndex = ...):
         if parent.column() > 0:
             return 0
         if not parent.isValid():
-            parentItem = self.mRootItem
+            parent_item = self.root_item
         else:
-            parentItem = parent.internalPointer()
+            parent_item = parent.internalPointer()
 
-        return parentItem.childCount()
+        return len(parent_item.children)
 
     def columnCount(self, parent: QModelIndex = ...):
         return 3
@@ -208,38 +242,16 @@ class QJsonModel(QAbstractItemModel):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
+    model = QJsonModel(json_data=DEMO_JSON)
+
+    # or use a dict as data-source
+    # model = QJsonModel(json_data=DEMO_DICT)
+
+    # or use a filename
+    # model = QJsonModel(json_data="json-data.json")
+
     view = QTreeView()
-    model = QJsonModel()
-
     view.setModel(model)
-
-    json = b"""{
-                       "firstName": "John",
-                       "lastName": "Smith",
-                       "age": 25,
-                       "address":
-                       {
-                           "streetAddress": "21 2nd Street",
-                           "city": "New York",
-                           "state": "NY",
-                           "postalCode": "10021"
-                       },
-                       "phoneNumber":
-                       [
-                           {
-                             "type": "home",
-                             "number": "212 555-1234"
-                           },
-                           {
-                             "type": "fax",
-                             "number": "646 555-4567"
-                           }
-                       ]
-                   }"""
-
-    model.loadJson(json)
-    # or
-    #    model.load("./your.json")
     view.show()
 
     sys.exit(app.exec_())
