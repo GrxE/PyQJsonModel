@@ -2,24 +2,24 @@
 
 import sys
 
-from PyQt5.QtCore import QAbstractItemModel, QModelIndex, Qt, QAbstractListModel, QMimeData, \
-    QDataStream, QByteArray, QJsonDocument, QVariant, QJsonValue, QJsonParseError
-from PyQt5.QtWidgets import QApplication, QFileDialog, QTreeView
+from PySide2.QtCore import QAbstractItemModel, QModelIndex, Qt, QJsonDocument, QJsonValue, QJsonParseError
+from PySide2.QtWidgets import QApplication, QTreeView
 
-class QJsonTreeItem(object ):
+
+class QJsonTreeItem(object):
     # Please note that its baseclass is object, not is QObject !!
-    # If you try use QObejct , may be can't drag and drop itself.
+    # If you try use QObject , may be can't drag and drop itself.
     def __init__(self, parent=None):
 
         self.mParent = parent
         self.mChilds = []
-        self.mType =None
-        self.mValue =None
+        self.mType = None
+        self.mValue = None
 
     def appendChild(self, item):
         self.mChilds.append(item)
 
-    def child(self, row:int):
+    def child(self, row: int):
         return self.mChilds[row]
 
     def parent(self):
@@ -33,13 +33,13 @@ class QJsonTreeItem(object ):
             return self.mParent.mChilds.index(self)
         return 0
 
-    def setKey(self, key:str):
+    def setKey(self, key: str):
         self.mKey = key
 
-    def setValue(self, value:str):
-       self. mValue = value
+    def setValue(self, value: str):
+        self.mValue = value
 
-    def setType(self, type:QJsonValue.Type):
+    def setType(self, type: QJsonValue.Type):
         self.mType = type
 
     def key(self):
@@ -105,16 +105,16 @@ class QJsonTreeItem(object ):
 
 
 class QJsonModel(QAbstractItemModel):
-    def __init__(self, parent =None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.mRootItem = QJsonTreeItem()
-        self.mHeaders = ["key","value","type"]
+        self.mHeaders = ["key", "value", "type"]
 
-    def load(self,fileName):
+    def load(self, fileName):
         if fileName is None or fileName is False:
             return False
 
-        with open(fileName, "rb" ) as file:
+        with open(fileName, "rb") as file:
             if file is None:
                 return False
             else:
@@ -123,14 +123,14 @@ class QJsonModel(QAbstractItemModel):
 
     def loadJson(self, json):
         error = QJsonParseError()
-        self.mDocument = QJsonDocument.fromJson(json,error)
+        self.mDocument = QJsonDocument.fromJson(json, error)
 
         if self.mDocument is not None:
             self.beginResetModel()
             if self.mDocument.isArray():
-                self.mRootItem.load( list( self.mDocument.array()))
+                self.mRootItem.load(list(self.mDocument.array()))
             else:
-                self.mRootItem = self.mRootItem.load( self.mDocument.object())
+                self.mRootItem = self.mRootItem.load(self.mDocument.object())
             self.endResetModel()
 
             return True
@@ -140,29 +140,30 @@ class QJsonModel(QAbstractItemModel):
 
     def data(self, index: QModelIndex, role: int = ...):
         if not index.isValid():
-            return QVariant()
+            return None
 
         item = index.internalPointer()
         col = index.column()
 
         if role == Qt.DisplayRole:
             if col == 0:
-                return str(item.key())
+                return item.key()
             elif col == 1:
-                return str(item.value())
+                value = item.value()
+                return value
             elif col == 2:
                 return str(item.type())
 
-        return QVariant()
+        return None
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...):
         if role != Qt.DisplayRole:
-            return QVariant()
+            return None
 
         if orientation == Qt.Horizontal:
             return self.mHeaders[section]
 
-        return QVariant()
+        return None
 
     def index(self, row: int, column: int, parent: QModelIndex = ...):
         if not self.hasIndex(row, column, parent):
@@ -188,7 +189,7 @@ class QJsonModel(QAbstractItemModel):
         if parentItem == self.mRootItem:
             return QModelIndex()
 
-        return self.createIndex(parentItem.row(),0, parentItem)
+        return self.createIndex(parentItem.row(), 0, parentItem)
 
     def rowCount(self, parent: QModelIndex = ...):
         if parent.column() > 0:
@@ -237,8 +238,8 @@ if __name__ == '__main__':
                    }"""
 
     model.loadJson(json)
-#or
-#    model.load("./your.json")
+    # or
+    #    model.load("./your.json")
     view.show()
 
     sys.exit(app.exec_())
