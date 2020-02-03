@@ -88,7 +88,7 @@ class QJsonTreeItem:
         :param parent: insert value below this parent, if None, it´s the root node
         :return: the tree-structure of QJsonTreeItems
         """
-        root_item = QJsonTreeItem(parent)
+        root_item = QJsonTreeItem(parent=parent)
         root_item.key = "root"
 
         if isinstance(value, dict):
