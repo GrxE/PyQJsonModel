@@ -146,7 +146,6 @@ class QJsonModel(QAbstractItemModel):
 
         else:
             # try as file
-            print(f"from file")
             if self.load_from_file(filename=json_data):
                 return
 
