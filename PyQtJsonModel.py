@@ -109,11 +109,21 @@ class QJsonTreeItem:
         root_item.typename = type(value).__name__
         return root_item
 
+    @property
+    def as_dict(self):
+        typename = self.typename
+        if (children := self.children) and typename == "dict":
+            return {child.key: child.as_dict for child in children}
+        elif (children := self.children) and typename == "list":
+            return [child.as_dict for child in children]
+        return self.value
+
 
 class QJsonModel(QAbstractItemModel):
     """To be used as a model with a QTreeView to show contents of a JSON
 
     """
+
     def __init__(self, parent=None, json_data=None):
         super().__init__(parent)
         self.document = None
@@ -187,7 +197,18 @@ class QJsonModel(QAbstractItemModel):
             elif col == 2:
                 return item.typename
 
+        elif role == Qt.EditRole:
+            return item.value
+
         return None
+
+    def setData(self, index: QModelIndex, value, role: int = ...) -> bool:
+        if role == Qt.EditRole:
+            item = index.internalPointer()
+            item.value = value
+            return True
+
+        return False
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...):
         if role != Qt.DisplayRole:
@@ -237,6 +258,15 @@ class QJsonModel(QAbstractItemModel):
     def columnCount(self, parent: QModelIndex = ...):
         return 3
 
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+        if not index.isValid():
+            return Qt.NoItemFlags
+        return Qt.ItemIsEditable | super().flags(index)
+
+    @property
+    def as_dict(self):
+        return self.root_item.as_dict
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
@@ -252,5 +282,7 @@ if __name__ == '__main__':
     view = QTreeView()
     view.setModel(model)
     view.show()
+
+    print(f"Current data: {model.as_dict}")
 
     sys.exit(app.exec_())
