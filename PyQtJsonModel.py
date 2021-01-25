@@ -202,15 +202,26 @@ class QJsonModel(QAbstractItemModel):
                 return item.typename
 
         elif role == Qt.EditRole:
-            return item.value
+            if col == 0:
+                return item.key
+            elif col == 1:
+                value = item.value
+                return value
 
         return None
 
     def setData(self, index: QModelIndex, value, role: int = ...) -> bool:
         if role == Qt.EditRole:
+            col = index.column()
             item = index.internalPointer()
-            item.value = value
-            return True
+
+            if col == 0:
+                item.key = value
+                return True
+            elif col == 1:
+                item.value = value
+                item.typename = type(value).__name__
+                return True
 
         return False
 
@@ -265,7 +276,9 @@ class QJsonModel(QAbstractItemModel):
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         if not index.isValid():
             return Qt.NoItemFlags
-        return Qt.ItemIsEditable | super().flags(index)
+        if index.column() != 2:
+            return Qt.ItemIsEditable | super().flags(index)
+        return super().flags(index)
 
     @property
     def as_dict(self):
