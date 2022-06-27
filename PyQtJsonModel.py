@@ -196,8 +196,7 @@ class QJsonModel(QAbstractItemModel):
             if col == 0:
                 return item.key
             elif col == 1:
-                value = item.value
-                return value
+                return  item.value
             elif col == 2:
                 return item.typename
 
@@ -205,8 +204,7 @@ class QJsonModel(QAbstractItemModel):
             if col == 0:
                 return item.key
             elif col == 1:
-                value = item.value
-                return value
+                return item.value
 
         return None
 

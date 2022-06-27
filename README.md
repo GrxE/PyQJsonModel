@@ -10,4 +10,6 @@ You need Python3(>=.7) and PySide2 (>=5.14) installed. This is what I used at th
 
 Update 2021-01-24: Model supports editing. The current, edited value can be retrieved by the property `as_dict` from the model. Tested with Python 3.9.1 and PySide2 5.15.2
 
-Any comments welcome to info @ rabotix.de
+Update 2022-06-27: Minor cleanup. Tested with Python 3.9.13
+
+Any comments welcome to info{at}rabotix.de
